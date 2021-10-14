@@ -2,18 +2,21 @@ import sys
 filename = sys.argv[1]
 
 m = [] # mid points
-p = [] # frequencies
+f = [] # frequencies
+p = []
 
 with open(filename) as file:
     for line in file:
         line = line.strip().split()
         m.append(float(line[0]))
-        p.append(float(line[1]))
+        f.append(float(line[1]))
 
 n = len(m)
 x_bar = 0
 for i in range(n):
-    x_bar += m[i]*p[i]
+    p.append(f[i]/sum(f))
+    x_bar += m[i]*(p[i])
+    
 
 s = 0
 for i in range(n):
