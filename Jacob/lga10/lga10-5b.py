@@ -99,7 +99,17 @@ start = np.arange(0,NUM_SIMULATIONS - 1)
 plot_values = []
 for v in values:
     plot_values.append(v[0])
+avg = [values[0][0]]
+
+for i, v in enumerate(values):
+    sum = 0
+    for x in range(i):
+        sum += values[x][0]
+    if i != 0:
+        avg.append(sum/i)
+
 plt.plot(start,plot_values, "o")
+plt.plot(start,avg, "o", color='k')
 plt.hlines(upper_bound, 0, NUM_SIMULATIONS, color='r')
 plt.hlines(lower_bound, 0, NUM_SIMULATIONS, color='r')
 plt.show()
