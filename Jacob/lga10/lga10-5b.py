@@ -63,7 +63,7 @@ def simulate():
         v_i = v_i + (i - 1) / i * (w_i - w_bar_array[i - 1]) ** 2
         v_array.append(v_i)
         s = (v_i / i) ** (1 / 2)
-    return sum(w_i_arr[-1000:-1])/1000, (sum(v_array[-1000:-1])/1000)**(1/2)
+    return sum(w_i_arr[-1000:-1])/1000, s
 
 
 '''
