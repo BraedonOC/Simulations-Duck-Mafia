@@ -90,6 +90,6 @@ while length(eventList) > 0
         global orderCount += 1 
         global t += exponential(7)
     end
-    println(t, " ", orderCount, " ", backorderCount, " ", length(eventList))
+    println(t, " ", orderCount, " ", backorderCount, " ")
 end
 
