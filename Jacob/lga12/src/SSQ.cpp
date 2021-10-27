@@ -1,11 +1,15 @@
 #include "SSQ.hpp"
 
-
 std::queue<Event> job_queue; 
 
-SSQ::SSQ() {
+SSQ::SSQ(int num_servers) {
 	job_queue = std::queue<Event>();
 	inService = false;
+	this->num_servers = num_servers;
+	for (int i = 0; i < num_servers; i++){
+		ServiceNode node;
+		nodes.push_back(node);
+	}
 }
 	
 void SSQ::enque_e(Event e) {
@@ -35,4 +39,8 @@ bool SSQ::is_in_service() {
 
 void SSQ::update_service(bool u) {
 	inService = u;
+}
+
+int SSQ::get_num_servers(){
+	return num_servers;
 }

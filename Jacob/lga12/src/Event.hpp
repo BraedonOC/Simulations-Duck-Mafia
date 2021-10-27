@@ -30,6 +30,10 @@ class Event{
 			type = t;
 		}
 
+		Event(){
+			type = EventType::NULL_JOB;
+		}
+
 		bool operator <(const Event & eventObj) const{
 			return at < eventObj.at;
 		}

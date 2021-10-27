@@ -11,14 +11,12 @@
 #include "Clock.hpp"
 #include "Event.hpp"
 #include "Welford.hpp"
+#include "ServiceNode.hpp"
 
 typedef std::vector<std::string> CommandLineStringArgs;
 const double TAU = 1000.0;
-const double LAMBDA_1 = 2.0;
-const double TIME_TO_COMPLETE = 10.0;
-
-// Create a list of SSQ's
-std::list<SSQ> ssq_list;
+const double R_BAR = 2.0;
+const double TIME_TO_COMPLETE = 100.0;
 
 /*
 *	Grabbing a random double between 0 an 1
@@ -26,20 +24,11 @@ std::list<SSQ> ssq_list;
 
 std::random_device rd;
 std::mt19937 gen(rd());
+std::uniform_real_distribution<> dis(0.0, 1.0);
 double nextDouble(){
-	std::uniform_real_distribution<> dis(0.0, 1.0);
 	return dis(gen);
 }
 
-int num_busy_servers(){
-	int b = 0;
-	for(std::list<SSQ>::iterator it = ssq_list.begin(); it != ssq_list.end(); ++it){
-		if(it->is_in_service()){
-			b++;
-		}
-	}
-	return b;
-}
 /*
 * Get next exponential random
 */
@@ -61,128 +50,125 @@ int main(int argc, char *argv[]) {
 	CommandLineStringArgs cmdlineStringArgs(&argv[0], &argv[0 + argc]);
 	int num_servers = std::stoi(cmdlineStringArgs[1]);
 	
-	std::list<Event> events;
-	Clock clock = Clock();
-
-	for (int i = 0; i < num_servers; i++){
-		SSQ ssq = SSQ();
-		ssq_list.push_back(ssq);
-	}
-
-	// We need a map or some way to track which events belong to which queues
-	std::map<Event, SSQ*> event_map;
-
 	// Our welford object which will track the percentage of servers occupied
-	Welford wel;
-
-	int newJobCount = 0;
-	int jobsServiced = 0;
-	int busy_servers = 0;
-
-	Event job1 = Event(exponential(LAMBDA_1), uniform(0,TIME_TO_COMPLETE), EventType::JOB_ARRIVAL);
-	events.push_back(job1);
+	// another Welford can be used to generate simulation statistics
+	Welford sim_wel;
 	
-	while( events.size() > 0 ) {
-
+	for (int i = 0; i < 100; i++){
+		std::list<Event> events;
+		Clock clock = Clock();
+		Welford wel;
 		
-		events.sort();
-		Event event = events.front();
-		events.pop_front();
-		clock.set_time(event.get_at()); // PROCESS EVENT
-		
+		SSQ ssq = SSQ(num_servers);
 
-		switch( event.get_type() ) {
-		case JOB_ARRIVAL:
-		{			
-			newJobCount++;
-			// Schedule the next job arrival
-			double nextArrival = clock.get_time() + exponential(LAMBDA_1);
-			if (nextArrival < TAU) {
-				// SCHEDULE NEW EVENT
-				Event newEvent = Event(
-										nextArrival, 
-										uniform(0, TIME_TO_COMPLETE),
-										EventType::JOB_ARRIVAL);
-				events.push_back(newEvent);
-			}
+		// We need a map or some way to track which events belong to which queues
+		std::map<Event, ServiceNode*> event_map;		
+
+		int newJobCount = 0;
+		int jobsServiced = 0;
+		int busy_servers = 0;
+
+		Event job1 = Event(exponential(R_BAR), uniform(0,TIME_TO_COMPLETE), EventType::JOB_ARRIVAL);
+		events.push_back(job1);
+		
+		while( events.size() > 0 ) {
 			
-		}
-		case FEEDBACK_ARRIVAL:
-		{	
-			SSQ *ssq;
-			int min_jobs = INT16_MAX;
-
-			// Finding optimal queue to place job into
-			for(int i = 0; i < ssq_list.size(); i++){
-
-				auto it = std::next(ssq_list.begin(), i);				
-				if (it->get_l() < min_jobs) {
-					ssq = &(*it);
-					min_jobs = it->get_l();
-				}			
-			}
+			events.sort();
+			Event event = events.front();
+			events.pop_front();
+			clock.set_time(event.get_at()); // PROCESS EVENT
 			
-			ssq->enque_e(event);
-			break;
-		}
-		case JOB_COMPLETION:
-		{
-			
-			if ( uniform(0,1) < 0.25) {
-				double feedbackArrival = clock.get_time() + exponential(1.0);
-				double lastService = event.get_service();
-				Event feedback = Event(
-										feedbackArrival, 
-										lastService/2.0, EventType::FEEDBACK_ARRIVAL);
-				events.push_back(feedback);
-			}
-			SSQ *ssq = event_map[event];								
-			ssq->update_service(false);
-
-			busy_servers--;
-			bool b = (busy_servers >= num_servers/2);
-			wel.update((double) b, clock.get_time());
-			break;
-		}
-		default:
-			break;
-		}
-		
-		// Now we iterate over all the queues and get those with jobs
-		// being serviced to complete those jobs
-		
-		
-		for(int i = 0; i < ssq_list.size(); i++){
-
-			SSQ* ssq  = &(*std::next(ssq_list.begin(), i));
-			if ( !ssq->is_in_service() && ssq->get_l() > 0) {
-				Event e = ssq->get_event();
-				Event complete = Event(
-										clock.get_time() + e.get_service(), 
-										0.0, 
-										EventType::JOB_COMPLETION);
-
-				events.push_back(complete);
-				ssq->update_service(true);
+			switch( event.get_type() ) {
+			case JOB_ARRIVAL:
+			{			
+				newJobCount++;
+				// Schedule the next job arrival
+				double nextArrival = clock.get_time() + exponential(R_BAR);
+				if (nextArrival < TAU) {
+					// SCHEDULE NEW EVENT
+					Event newEvent = Event(
+											nextArrival, 
+											uniform(0, TIME_TO_COMPLETE),
+											EventType::JOB_ARRIVAL);
+					events.push_back(newEvent);
+				}
 				
-				jobsServiced++;
-
-				// We need to map this event to the proper queue
-				// so we dequeue correctly
-				event_map.insert(std::make_pair(complete, ssq));
-
-				busy_servers++;
-				bool b = (busy_servers >= num_servers/2);
+			}
+			case FEEDBACK_ARRIVAL:
+			{	
+				ssq.enque_e(event);
+				break;
+			}
+			case JOB_COMPLETION:
+			{
+				
+				if ( uniform(0,1) < 0.25) {
+					double feedbackArrival = clock.get_time() + exponential(1.0);
+					double lastService = event.get_service();
+					Event feedback = Event(
+											feedbackArrival, 
+											lastService/2.0, EventType::FEEDBACK_ARRIVAL);
+					events.push_back(feedback);
+				}
+				
+				
+				ServiceNode *node = event_map[event];				
+				node->switchService(false);						
+						
+				busy_servers--;
+				bool b =  busy_servers >= num_servers/2;
 				wel.update((double) b, clock.get_time());
+				
+				break;
+			}
+			default:
+				break;
+			}
+			
+			// Now we iterate over all the service nodes and get those with jobs
+			// being serviced to complete those jobs
+		
+			for(int i = 0; i < ssq.nodes.size(); i++){
+				ServiceNode* node = &(*std::next(ssq.nodes.begin(),i));
+				
+				if ( !node->get_inService() && ssq.get_l() > 0) {
+					Event e = ssq.get_event();
+					node->switchService(true);
+					node->placeEvent(e);
+					Event complete = Event(
+											clock.get_time() + e.get_service(), 
+											0.0, 
+											EventType::JOB_COMPLETION);
+
+					events.push_back(complete);
+					
+					jobsServiced++;
+
+					// We need to map this event to the proper node
+					// so we dequeue correctly
+					event_map.insert(std::make_pair(complete, node));
+
+					busy_servers++;
+					bool b =  busy_servers >= num_servers /2;
+					wel.update((double) b, clock.get_time());
+				}
 			}
 		}
+
+		// this comment section can be used to get the results of a single sim
+		// printf ("Final time: %f\nNew jobs: %d\nJobs serviced: %d\nWelford mean: %f\nWelford variance: %f\n", 
+		// 			clock.get_time(), 
+		// 			newJobCount, 
+		// 			jobsServiced,
+		// 			wel.get_x_bar(),
+		// 			wel.get_v_bar());
+		sim_wel.simple_update(wel.get_x_bar());
+		
 	}
-	printf ("Final time: %f\nNew jobs: %d\nJobs serviced: %d\nWelford mean: %f\nWelford variance: %f\n", 
-				 clock.get_time(), 
-				 newJobCount, 
-				 jobsServiced,
-				 wel.get_x_bar(),
-				 wel.get_v_bar());
+	
+	printf ("%f\n%f\n", 
+				sim_wel.get_x_bar(),
+				sim_wel.get_v_bar());
 	return 0;
 }
 

@@ -10,4 +10,5 @@ class Welford {
         double get_x_bar();
         double get_v_bar();
         void update(double x_i, double t_i);
+        void simple_update(double x_i);
 };
